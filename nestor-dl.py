@@ -14,6 +14,7 @@ from pprint import pprint
 
 BASE_URL = "https://nestor.rug.nl"
 OUTPUT_DIR = './nestor-dl-out'
+BLACKBOARD_COLLAB_TOOL_ID = "_4680_1"
 
 
 def save_css():
@@ -93,9 +94,21 @@ def get_courses():
             available_courses.append(course)
     return available_courses
 
+# todo !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+def get_bbcollab_lectures():
+    courses = session.get(
+        BASE_URL + "/webapps/RuG-MyCourses-bb_bb60/do/coursesJson").json()
+    available_courses = []
+    for course in courses["enrollmentList"]:
+        if course['available']:
+            available_courses.append(course)
+    return available_courses
 
+# Download the selected courses
 def download_courses(courses):
     homepage_links = []
+    
+    # go through all courses one by one
     for course in courses:
         print("[Course] " + course['courseTitle'])
 
@@ -122,9 +135,13 @@ def download_courses(courses):
                 if "listContent.jsp" in link["href"]:
                     content_areas.append({"title": link.get_text(), "id": link["href"].split(
                         "content_id=")[1].split('&')[0]})
+                # check for blackboard link and show if found.
+                if save_lectures and "launchLink.jsp" in link["href"] and "tool_id="+BLACKBOARD_COLLAB_TOOL_ID in link["href"]:
+                    print("!blackboard collaborate link: ", link["href"])
 
         content_areas_in_menu = content_areas.copy()
 
+        # go through all found content areas one by one
         for content_area in content_areas:
             print("[Content Area] " + content_area["title"])
             response = session.get(
@@ -214,6 +231,15 @@ questions = [
 
 ]
 answers = inquirer.prompt(questions)
+
+# ask for saving BBcollab lectures
+save_lectures = inquirer.confirm("Save BBCollab lectures?", default=False)
+
+if save_lectures is True:
+    # ask for bbcollab token and store it
+    bbcollab_token = inquirer.prompt([inquirer.Text(
+    'bbcollabtoken', message="Enter your bbcollab token"), ])['bbcollabtoken']
+
 for course in courses:
     if course['courseTitle'] + " [" + course['courseCode'] + "]" in answers['courses']:
         selected_courses.append(course)
