@@ -24,20 +24,20 @@ from blackboard import download_blackboard_lectures
 # parsing response url
 
 # debug logging
-import logging
+# import logging
 
 # # These two lines enable debugging at httplib level (requests->urllib3->http.client)
 # # You will see the REQUEST, including HEADERS and DATA, and RESPONSE with HEADERS but without DATA.
 # # The only thing missing will be the response.body which is not logged.
-import http.client as http_client
-http_client.HTTPConnection.debuglevel = 1
+# import http.client as http_client
+# http_client.HTTPConnection.debuglevel = 1
 
 # # You must initialize logging, otherwise you'll not see debug output.
-logging.basicConfig()
-logging.getLogger().setLevel(logging.DEBUG)
-requests_log = logging.getLogger("requests.packages.urllib3")
-requests_log.setLevel(logging.DEBUG)
-requests_log.propagate = True
+# logging.basicConfig()
+# logging.getLogger().setLevel(logging.DEBUG)
+# requests_log = logging.getLogger("requests.packages.urllib3")
+# requests_log.setLevel(logging.DEBUG)
+# requests_log.propagate = True
 
 # TODO: move html generation to another function!!
 
@@ -154,27 +154,30 @@ def download_courses(courses):
             # download lecture videos as requested by user
             download_blackboard_lectures(session,
                                          course, OUTPUT_DIR + "/" + course["courseCode"] + "/lectures.html")
+            # TODO: download p2go lectures here!
 
         content_areas = []
         all_files = []
 
         coursemenu = soup.find('ul', {'class': 'courseMenu'})
         if coursemenu:
-            for link in coursemenu.findAll('a'):
-                if "listContent.jsp" in link["href"]:
-                    content_areas.append({"title": link.get_text(), "id": link["href"].split(
+            for file_link in coursemenu.findAll('a'):
+                if "listContent.jsp" in file_link["href"]:
+                    content_areas.append({"title": file_link.get_text(), "id": file_link["href"].split(
                         "content_id=")[1].split('&')[0]})
+
                 # TODO: REMOVEEE!!!!! DEBUG!!!! check for blackboard link and show if found.
-                if save_lectures and "launchLink.jsp" in link["href"] and "tool_id=" + BLACKBOARD_COLLAB_TOOL_ID in \
-                        link["href"]:
-                    print("!blackboard collaborate link: ", link["href"])
+                if save_lectures and "launchLink.jsp" in file_link["href"] and "tool_id=" + BLACKBOARD_COLLAB_TOOL_ID in \
+                        file_link["href"]:
+                    pass
+                    # print("!blackboard collaborate link: ", file_link["href"])
 
         content_areas_in_menu = content_areas.copy()
 
         # add lecture page to menu
         if save_lectures is True:
-            # FLAWED BROKEN UGLY IMPLEMENTATION. CURRENTLY OPENS THE './lectures.html' FOLDER!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            # TODO: lectures.html page for displaying lectures
+            # FLAWED BROKEN UGLY TEMP DEV IMPLEMENTATION. CURRENTLY OPENS THE './lectures.html' FOLDER!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            # TODO: WIP generate actual lectures.html page for displaying lectures, instead of it being a folder
             # FIXME: generate only if lectures actually there for course
             content_areas_in_menu.append(
                 {"title": "Lectures", "id": "./lectures"})
@@ -208,20 +211,24 @@ def download_courses(courses):
 
                         for attachment in attachments.findAll('li', {'class': ''}):
                             name = attachment.a.get_text()
-                            print("[Attachment] " + name)
-                            link = "./attachments/" + \
-                                   attachment.a["href"].split(
-                                       '/')[-1] + "_" + name
-                            files.append({'name': name, 'link': link})
-                            all_files.append({'name': name, 'link': link})
+                            file_path = f"{OUTPUT_DIR}/{course['courseCode']}/attachments/{attachment.a['href'].split('/')[-1]}_{name}"
+                            file_link = f"./attachments/{attachment.a['href'].split('/')[-1]}_{name}"
 
-                            # save file
-                            response = session.get(
-                                BASE_URL + attachment.a["href"])
-                            with open(OUTPUT_DIR + "/" + course["courseCode"] + "/attachments/" +
-                                      attachment.a["href"].split(
-                                          '/')[-1] + "_" + name, "wb") as f:
-                                f.write(response.content)
+                            # Add link for file to files, used to generate the links in the html output
+                            files.append({'name': name, 'link': file_link})
+                            all_files.append({'name': name, 'link': file_link})
+
+                            if os.path.exists(file_path):
+                                # File already exists
+                                print(f"[Attachment] '{name}' skipping, already downloaded")
+                            else:
+                                print("[Attachment] " + name)
+                                # TODO: stream maybe?
+                                # download to memory & save file
+                                response = session.get(BASE_URL + attachment.a["href"])
+
+                                with open(file_path, "wb") as f:
+                                    f.write(response.content)
 
                         new_attachments = BeautifulSoup(
                             content_item_attachments_template(files), 'html.parser')
