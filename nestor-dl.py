@@ -18,14 +18,11 @@ from constants import BASE_URL, OUTPUT_DIR, BLACKBOARD_COLLAB_TOOL_ID
 # Import module for downloading blackboard lectures
 from blackboard import download_blackboard_lectures
 
+from htmlgen import content_item_attachments_template, content_area_template, content_item_template, save_css
 
-# for converting lecture filenames to safe names
 
-# parsing response url
 
-# debug logging
-# import logging
-
+"""For enabling debugging of requests"""
 # # These two lines enable debugging at httplib level (requests->urllib3->http.client)
 # # You will see the REQUEST, including HEADERS and DATA, and RESPONSE with HEADERS but without DATA.
 # # The only thing missing will be the response.body which is not logged.
@@ -33,80 +30,12 @@ from blackboard import download_blackboard_lectures
 # http_client.HTTPConnection.debuglevel = 1
 
 # # You must initialize logging, otherwise you'll not see debug output.
+# import logging
 # logging.basicConfig()
 # logging.getLogger().setLevel(logging.DEBUG)
 # requests_log = logging.getLogger("requests.packages.urllib3")
 # requests_log.setLevel(logging.DEBUG)
 # requests_log.propagate = True
-
-# TODO: move html generation to another function!!
-
-
-def save_css():
-    theme_css = session.get(f"{BASE_URL}/branding/themes/StudentPortalv3800.200609/theme.css").content
-    with open(OUTPUT_DIR + "/theme.css", "wb") as f:
-        f.write(theme_css)
-
-    shared_css = session.get(f"{BASE_URL}/common/shared.css").content
-    with open(OUTPUT_DIR + "/shared.css", "wb") as f:
-        f.write(shared_css)
-
-
-def content_item_attachments_template(files):
-    with open('./html/content_item_attachments.html', 'r') as file:
-        template = file.read().replace('\n', '')
-        links_html = ""
-        for file in files:
-            links_html += content_item_attachment_template(file)
-        template = template.replace('[ITEMS]', links_html)
-        return template
-
-
-def content_item_attachment_template(file):
-    name = file['name']
-    link = file['link']
-
-    with open('./html/content_item_attachment.html', 'r') as file:
-        template = file.read().replace('\n', '')
-        template = template.replace('[LINK]', link)
-        template = template.replace('[NAME]', name)
-        return template
-
-
-def content_area_template(title, course, links, items, dir_level):
-    with open('./html/content_area.html', 'r') as file:
-        template = file.read().replace('\n', '')
-        template = template.replace('[TITLE]', title)
-        template = template.replace('[COURSE]', course['courseTitle'])
-        links_html = ""
-        for link in links:
-            links_html += content_area_link_template(link)
-        template = template.replace('[LINKS]', links_html)
-        template = template.replace('[ITEMS]', items)
-        css_theme = "theme.css"
-        css_shared = "shared.css"
-        overview_btn = ""
-        if dir_level > 0:
-            css_theme = "../" + css_theme
-            css_shared = "../" + css_shared
-            overview_btn = "<a href=\"../index.html\"><li class=\"root coursePath\">Course Overview</li></a>"
-        template = template.replace('[CSS_THEME]', css_theme)
-        template = template.replace('[CSS_SHARED]', css_shared)
-        template = template.replace('[OVERVIEW_BTN]', overview_btn)
-        return template
-
-
-def content_area_link_template(content_area):
-    with open('./html/content_area_link.html', 'r') as file:
-        template = file.read().replace('\n', '')
-        template = template.replace('[LINK]', content_area['id'] + ".html")
-        template = template.replace('[TEXT]', content_area['title'])
-        return template
-
-
-def content_item_template(title, details):
-    with open('./html/content_item.html', 'r') as file:
-        return file.read().replace('\n', '').replace('[TITLE]', title).replace('[DETAILS]', details)
 
 
 def get_courses():
@@ -156,9 +85,8 @@ def download_courses(courses):
                                          course, OUTPUT_DIR + "/" + course["courseCode"] + "/lectures.html")
             # TODO: download p2go lectures here!
 
+        # Parse course menu
         content_areas = []
-        all_files = []
-
         coursemenu = soup.find('ul', {'class': 'courseMenu'})
         if coursemenu:
             for file_link in coursemenu.findAll('a'):
@@ -183,6 +111,7 @@ def download_courses(courses):
                 {"title": "Lectures", "id": "./lectures"})
 
         # go through all found content areas one by one
+        all_files = []
         for content_area in content_areas:
             print("[Content Area] " + content_area["title"])
             response = session.get(
@@ -252,6 +181,8 @@ def download_courses(courses):
             f.write(content_area_template(
                 course['courseTitle'], course, content_areas_in_menu, items, 1))
 
+    # generate index.html homepage
+    # TODO: switch to different template
     with open(OUTPUT_DIR + "/index.html", "w") as f:
         f.write(content_area_template("nestor-dl dump homepage",
                                       {'courseTitle': 'NESTOR-DL'}, homepage_links, "", 0))
@@ -313,7 +244,7 @@ def main():
     for course in courses:
         if course['courseTitle'] + " [" + course['courseCode'] + "]" in answers['courses']:
             selected_courses.append(course)
-    save_css()
+    save_css(session)
     download_courses(selected_courses)
     webbrowser.open('file://' + os.path.realpath(OUTPUT_DIR + "/index.html"))
 

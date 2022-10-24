@@ -1,8 +1,6 @@
 import datetime
 import mimetypes
 import os.path
-import re
-import unicodedata
 from urllib.parse import urlparse, parse_qs
 
 import requests
